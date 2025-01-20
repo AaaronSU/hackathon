@@ -54,40 +54,57 @@
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <numeric>   // For std::accumulate
 #include <iomanip>   // For setting precision
 
-#define ui64 u_int64_t
+// For 64-bit unsigned
+#define ui64 uint64_t
 
 #include <sys/time.h>
-double
-dml_micros()
+double dml_micros()
 {
-        static struct timezone tz;
-        static struct timeval  tv;
-        gettimeofday(&tv,&tz);
-        return((tv.tv_sec*1000000.0)+tv.tv_usec);
+    static struct timezone tz;
+    static struct timeval  tv;
+    gettimeofday(&tv, &tz);
+    return (tv.tv_sec * 1000000.0) + tv.tv_usec;
 }
 
-// Function to generate Gaussian noise using Box-Muller transform
-double gaussian_box_muller() {
+// Function to generate Gaussian noise using Box-Muller transform.
+//   (Implementation: C++11 <random> with std::normal_distribution)
+double gaussian_box_muller()
+{
+    // Keep generator and distribution static so we don't re-initialize every call.
     static std::mt19937 generator(std::random_device{}());
     static std::normal_distribution<double> distribution(0.0, 1.0);
     return distribution(generator);
 }
 
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
-double black_scholes_monte_carlo(ui64 S0, ui64 K, double T, double r, double sigma, double q, ui64 num_simulations) {
+// with precomputed drift/vol/discount factors (for efficiency).
+double black_scholes_monte_carlo(
+    ui64 S0, ui64 K,
+    double T, double r,
+    double sigma, double q,
+    ui64 num_simulations)
+{
+    // Precompute factors
+    double drift    = (r - q - 0.5 * sigma * sigma) * T;
+    double vol      = sigma * std::sqrt(T);
+    double discount = std::exp(-r * T);
+
     double sum_payoffs = 0.0;
-    for (ui64 i = 0; i < num_simulations; ++i) {
-        double Z = gaussian_box_muller();
-        double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
-        double payoff = std::max(ST - K, 0.0);
+    for (ui64 i = 0; i < num_simulations; ++i)
+    {
+        double Z  = gaussian_box_muller();
+        double ST = S0 * std::exp(drift + vol * Z);  // Stock price at maturity
+        double payoff = std::max(ST - static_cast<double>(K), 0.0);
         sum_payoffs += payoff;
     }
-    return exp(-r * T) * (sum_payoffs / num_simulations);
+    return discount * (sum_payoffs / static_cast<double>(num_simulations));
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <num_simulations> <num_runs>" << std::endl;
         return 1;
@@ -96,47 +113,53 @@ int main(int argc, char* argv[]) {
     ui64 num_simulations = std::stoull(argv[1]);
     ui64 num_runs        = std::stoull(argv[2]);
 
-    // Input parameters
-    ui64 S0      = 100;                   // Initial stock price
-    ui64 K       = 110;                   // Strike price
-    double T     = 1.0;                   // Time to maturity (1 year)
-    double r     = 0.06;                  // Risk-free interest rate
-    double sigma = 0.2;                   // Volatility
-    double q     = 0.03;                  // Dividend yield
+    // Input parameters (fixed in this example)
+    ui64   S0    = 100;    // Initial stock price
+    ui64   K     = 110;    // Strike price
+    double T     = 1.0;    // Time to maturity (1 year)
+    double r     = 0.06;   // Risk-free interest rate
+    double sigma = 0.2;    // Volatility
+    double q     = 0.03;   // Dividend yield
 
     // Generate a random seed at the start of the program using random_device
     std::random_device rd;
     unsigned long long global_seed = rd();  // This will be the global seed
 
-    std::cout << "Global initial seed: " << global_seed << "      argv[1]= " << argv[1] << "     argv[2]= " << argv[2] <<  std::endl;
+    std::cout << "Global initial seed: " << global_seed
+              << "      argv[1]= " << argv[1]
+              << "     argv[2]= " << argv[2] << std::endl;
 
     std::vector<double> errors;
-    double t1=dml_micros();
+    errors.reserve(num_runs);
+
+    double t1 = dml_micros();
+
+    // Perform the requested number of runs. Each run does two MC price calculations
+    // and computes the relative error of the two results.
     for (ui64 run = 0; run < num_runs; ++run) {
         double theoretical_price = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
-        double actual_price = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
-        double relative_error = std::abs(theoretical_price - actual_price) / actual_price;
+        double actual_price      = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
+
+        double diff = std::fabs(theoretical_price - actual_price);
+        double relative_error = diff / std::fabs(actual_price);
         errors.push_back(relative_error);
-
-        // Print the values on one line with precision
-        /*
-        std::cout << std::fixed << std::setprecision(6)
-                  << "Run " << run + 1 << ": "
-                  << "Theoretical Price: " << theoretical_price << ", "
-                  << "Actual Price: " << actual_price << ", "
-                  << "Difference: " << theoretical_price - actual_price << std::endl; 
-        */
     }
-    double t2=dml_micros();
 
-    double min_error     = *std::min_element(errors.begin(), errors.end());
-    double max_error     = *std::max_element(errors.begin(), errors.end());
-    double average_error =  std::accumulate (errors.begin(), errors.end(), 0.0) / errors.size();
+    double t2 = dml_micros();
 
-    //std::cout << "%Best    Relative Error: " << min_error     * 100 << std::endl;
-    //std::cout << "%Worst   Relative Error: " << max_error     * 100 << std::endl;
-    std::cout << "%Average Relative Error: " << std::setprecision(9) << average_error * 100 << std::endl;
-    std::cout << "Performance in seconds : " << std::setprecision(3) << (t2-t1)/1000000.0   << std::endl;
+    // Compute min, max, average error
+    double min_error = *std::min_element(errors.begin(), errors.end());
+    double max_error = *std::max_element(errors.begin(), errors.end());
+    double avg_error = std::accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
+
+    // Print average relative error (as %) and performance
+    std::cout << "%Average Relative Error: "
+              << std::setprecision(9) << (avg_error * 100.0)
+              << std::endl;
+
+    std::cout << "Performance in seconds: "
+              << std::setprecision(3) << ((t2 - t1) / 1000000.0)
+              << std::endl;
 
     return 0;
 }

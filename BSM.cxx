@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
     double sum=0.0;
     double t1=dml_micros();
     for (ui64 run = 0; run < num_runs; ++run) {
-        sum+= black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
+        sum+= black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations, global_seed);
     }
     double t2=dml_micros();
     std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;

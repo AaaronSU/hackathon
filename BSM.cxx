@@ -56,7 +56,7 @@
 #include <algorithm>
 #include <iomanip>   // For setting precision
 #include <armpl.h>     // Include for ARM Performance Libraries
-#include <openmp.h>
+#include <omp.h>
 
 #define ui64 u_int64_t
 

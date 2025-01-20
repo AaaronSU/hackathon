@@ -97,6 +97,7 @@ double black_scholes_monte_carlo(ui64 S0, ui64 K, double T, double r, double sig
     double factor2 = sigma * sqrt_T;
     double *Z, *exp_output, *ST, *gaussian_output;
     gaussian_armpl(num_simulations, gaussian_output, global_seed);  // Generate Gaussian noise
+    #pragma omp parallel for
     for (ui64 i = 0; i < num_simulations; ++i) 
     {
         // double Z = gaussian_box_muller();
@@ -104,6 +105,7 @@ double black_scholes_monte_carlo(ui64 S0, ui64 K, double T, double r, double sig
     }
     // double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
     compute_exp_armpl(&factor1, exp_output, num_simulations);
+    #pragma omp parallel for
     for (ui64 i = 0; i < num_simulations; ++i) 
     {
         ST[i] = exp_output[i] * factor1;

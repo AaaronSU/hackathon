@@ -55,7 +55,6 @@
 #include <limits>
 #include <algorithm>
 #include <iomanip>   // For setting precision
-#include <immintrin.h>  // Include for SIMD intrinsics
 #include <armpl.h>     // Include for ARM Performance Libraries
 
 #define ui64 u_int64_t

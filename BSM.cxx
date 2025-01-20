@@ -52,15 +52,14 @@
 #include <cmath>
 #include <random>
 #include <vector>
-#include <limits>
 #include <algorithm>
-#include <numeric>   // For std::accumulate
-#include <iomanip>   // For setting precision
+#include <numeric>   // for std::accumulate
+#include <iomanip>
+#include <cstdlib>
+#include <sys/time.h>
 
-// For 64-bit unsigned
 #define ui64 uint64_t
 
-#include <sys/time.h>
 double dml_micros()
 {
     static struct timezone tz;
@@ -69,97 +68,136 @@ double dml_micros()
     return (tv.tv_sec * 1000000.0) + tv.tv_usec;
 }
 
-// Function to generate Gaussian noise using Box-Muller transform.
-//   (Implementation: C++11 <random> with std::normal_distribution)
-double gaussian_box_muller()
+// --------------------------------------------------------
+// We move the RNG & distribution to file scope or static
+// so they are not reinitialized every function call.
+// --------------------------------------------------------
+static std::mt19937 g_generator(std::random_device{}());
+static std::normal_distribution<double> g_normDist(0.0, 1.0);
+
+// --------------------------------------------------------
+// Fill an existing vector with num_samples standard normals
+// using g_generator and g_normDist
+// --------------------------------------------------------
+void fill_normals(std::vector<double>& buffer)
 {
-    // Keep generator and distribution static so we don't re-initialize every call.
-    static std::mt19937 generator(std::random_device{}());
-    static std::normal_distribution<double> distribution(0.0, 1.0);
-    return distribution(generator);
+    for (auto &val : buffer) {
+        val = g_normDist(g_generator);
+    }
 }
 
-// Function to calculate the Black-Scholes call option price using Monte Carlo method
-// with precomputed drift/vol/discount factors (for efficiency).
-double black_scholes_monte_carlo(
-    ui64 S0, ui64 K,
-    double T, double r,
-    double sigma, double q,
-    ui64 num_simulations)
+// --------------------------------------------------------
+// Monte Carlo for a single call price calculation.
+// - Precompute drift, vol, discount outside the loop.
+// - Use an input vector of already-generated random draws
+//   to avoid distribution calls in the loop.
+// --------------------------------------------------------
+double mc_call_price(
+    ui64   S0,
+    ui64   K,
+    double drift,    // (r - q - 0.5*sigma^2)*T
+    double vol,      // sigma*sqrt(T)
+    double discount, // exp(-r*T)
+    const std::vector<double>& Zs  // all random draws
+)
 {
-    // Precompute factors
-    double drift    = (r - q - 0.5 * sigma * sigma) * T;
-    double vol      = sigma * std::sqrt(T);
-    double discount = std::exp(-r * T);
-
+    const size_t n = Zs.size();
     double sum_payoffs = 0.0;
-    for (ui64 i = 0; i < num_simulations; ++i)
-    {
-        double Z  = gaussian_box_muller();
-        double ST = S0 * std::exp(drift + vol * Z);  // Stock price at maturity
-        double payoff = std::max(ST - static_cast<double>(K), 0.0);
+
+// If you want parallel, enable OpenMP below:
+// #pragma omp parallel for reduction(+:sum_payoffs)
+    for (size_t i = 0; i < n; ++i) {
+        // S_T = S0 * exp(drift + vol * Z)
+        double ST = S0 * std::exp(drift + vol * Zs[i]);
+        double payoff = (ST > K) ? (ST - K) : 0.0;
         sum_payoffs += payoff;
     }
-    return discount * (sum_payoffs / static_cast<double>(num_simulations));
+    return discount * (sum_payoffs / static_cast<double>(n));
 }
 
 int main(int argc, char* argv[])
 {
     if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <num_simulations> <num_runs>" << std::endl;
+        std::cerr << "Usage: " << argv[0]
+                  << " <num_simulations> <num_runs>\n";
         return 1;
     }
 
     ui64 num_simulations = std::stoull(argv[1]);
     ui64 num_runs        = std::stoull(argv[2]);
 
-    // Input parameters (fixed in this example)
-    ui64   S0    = 100;    // Initial stock price
-    ui64   K     = 110;    // Strike price
-    double T     = 1.0;    // Time to maturity (1 year)
-    double r     = 0.06;   // Risk-free interest rate
-    double sigma = 0.2;    // Volatility
-    double q     = 0.03;   // Dividend yield
+    // Option parameters (fixed)
+    ui64   S0    = 100;   // spot
+    ui64   K     = 110;   // strike
+    double T     = 1.0;   // maturity
+    double r     = 0.06;  // interest rate
+    double sigma = 0.2;   // volatility
+    double q     = 0.03;  // dividend yield
 
-    // Generate a random seed at the start of the program using random_device
+    // Precompute drift, vol, discount factor
+    double drift    = (r - q - 0.5 * sigma * sigma) * T;
+    double vol      = sigma * std::sqrt(T);
+    double discount = std::exp(-r * T);
+
+    // Generate a random global seed to show in logs (though we already seeded g_generator).
     std::random_device rd;
-    unsigned long long global_seed = rd();  // This will be the global seed
-
-    std::cout << "Global initial seed: " << global_seed
-              << "      argv[1]= " << argv[1]
-              << "     argv[2]= " << argv[2] << std::endl;
+    unsigned long long global_seed = rd();
+    std::cout << "Global initial seed (for reference): "
+              << global_seed
+              << "   argv[1]= " << argv[1]
+              << "   argv[2]= " << argv[2] << std::endl;
 
     std::vector<double> errors;
     errors.reserve(num_runs);
 
+    // Allocate vectors for random draws, used twice per run
+    //  each run calls 2 Monte Carlo estimations:
+    //    1) theoretical_price
+    //    2) actual_price
+    // So we need 2 * num_simulations draws. We can fill them in one go.
+    std::vector<double> Z_buffer(2 * num_simulations);
+
     double t1 = dml_micros();
 
-    // Perform the requested number of runs. Each run does two MC price calculations
-    // and computes the relative error of the two results.
     for (ui64 run = 0; run < num_runs; ++run) {
-        double theoretical_price = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
-        double actual_price      = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
+        // Generate 2 * num_simulations random draws at once
+        fill_normals(Z_buffer);
 
+        // First half for "theoretical_price"
+        std::vector<double> Z_theo(Z_buffer.begin(),
+                                   Z_buffer.begin() + num_simulations);
+
+        // Second half for "actual_price"
+        std::vector<double> Z_actual(Z_buffer.begin() + num_simulations,
+                                     Z_buffer.end());
+
+        // Compute both prices
+        double theoretical_price = mc_call_price(S0, K, drift, vol, discount, Z_theo);
+        double actual_price      = mc_call_price(S0, K, drift, vol, discount, Z_actual);
+
+        // Compute relative error
         double diff = std::fabs(theoretical_price - actual_price);
-        double relative_error = diff / std::fabs(actual_price);
-        errors.push_back(relative_error);
+        // If actual_price is extremely close to zero, you might want
+        // to handle that carefully. But for this scenario it’s nonzero.
+        double rel_error = diff / std::fabs(actual_price);
+        errors.push_back(rel_error);
     }
 
     double t2 = dml_micros();
 
-    // Compute min, max, average error
+    // Stats
     double min_error = *std::min_element(errors.begin(), errors.end());
     double max_error = *std::max_element(errors.begin(), errors.end());
-    double avg_error = std::accumulate(errors.begin(), errors.end(), 0.0) / errors.size();
+    double avg_error = std::accumulate(errors.begin(), errors.end(), 0.0)
+                       / errors.size();
 
-    // Print average relative error (as %) and performance
     std::cout << "%Average Relative Error: "
               << std::setprecision(9) << (avg_error * 100.0)
               << std::endl;
 
-    std::cout << "Performance in seconds: "
-              << std::setprecision(3) << ((t2 - t1) / 1000000.0)
-              << std::endl;
+    std::cout << "Performance in seconds : "
+              << std::setprecision(3)
+              << ((t2 - t1) / 1000000.0) << std::endl;
 
     return 0;
 }

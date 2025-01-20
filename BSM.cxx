@@ -55,6 +55,8 @@
 #include <limits>
 #include <algorithm>
 #include <iomanip>   // For setting precision
+#include <immintrin.h>  // Include for SIMD intrinsics
+#include <armpl.h>     // Include for ARM Performance Libraries
 
 #define ui64 u_int64_t
 
@@ -75,13 +77,47 @@ double gaussian_box_muller() {
     return distribution(generator);
 }
 
+
+double gaussian_simd() 
+{
+    static std::mt19937 generator(std::random_device{}());
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+    // Generate 4 random numbers at once (using AVX2)
+    __m256d u1 = _mm256_set_pd(dist(generator), dist(generator), dist(generator), dist(generator));
+    __m256d u2 = _mm256_set_pd(dist(generator), dist(generator), dist(generator), dist(generator));
+
+    // Apply Box-Muller transform for each pair of u1 and u2
+    __m256d z0 = _mm256_sqrt_pd(_mm256_mul_pd(_mm256_sub_pd(_mm256_set1_pd(1.0), u1), _mm256_set1_pd(2.0)));
+    __m256d z1 = _mm256_cos_pd(_mm256_mul_pd(u2, _mm256_set1_pd(2 * M_PI)));
+
+    return _mm256_extract_epi64(z0, 0);  // Just for demonstration, need proper handling for 4 values
+}
+
+void compute_exp_armpl(const double* input, double* output, size_t n) 
+{
+    armpl_dexp(n, input, output);  // Arm PL optimized exp function
+}
+
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
 double black_scholes_monte_carlo(ui64 S0, ui64 K, double T, double r, double sigma, double q, ui64 num_simulations) {
     double sum_payoffs = 0.0;
-    for (ui64 i = 0; i < num_simulations; ++i) {
-        double Z = gaussian_box_muller();
-        double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
-        double payoff = std::max(ST - K, 0.0);
+    double sqrt_T = sqrt(T);
+    double factor1 = S0 * exp((r - q - 0.5 * sigma * sigma) * T);
+    double factor2 = sigma * sqrt_T;
+    double *Z, *exp_output, *ST;
+    for (ui64 i = 0; i < num_simulations; ++i) 
+    {
+        // double Z = gaussian_box_muller();
+        Z[i] = factor2 * gaussian_simd();
+    }
+    // double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
+    compute_exp_armpl(&factor1, exp_output, num_simulations);
+    for (ui64 i = 0; i < num_simulations; ++i) 
+    {
+        ST[i] = exp_output[i] * factor1;
+        //double payoff = std::max(ST - K, 0.0);
+        double payoff = (ST[i] > K) ? (ST[i] - K) : 0.0;
         sum_payoffs += payoff;
     }
     return exp(-r * T) * (sum_payoffs / num_simulations);

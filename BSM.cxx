@@ -103,10 +103,12 @@ double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 n
     // double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
         double exp_output = exp_fast(f2, Z, n1, n2, table_x, table_y, inv_h1, inv_h2);
 
+        /*
         // print
         std::cout << " exp_output = " << exp_output << std::endl;
         std::cout << " exp real =" << exp(Z * f2) << std::endl;
-    
+        */
+        
         double ST = exp_output * f1;
         //double payoff = std::max(ST - K, 0.0);
         double payoff = (ST > K) ? (ST - K) : 0.0;
@@ -145,8 +147,8 @@ int main(int argc, char* argv[]) {
     double factor3 = exp(-r * T);
 
     // Precompute the exp table
-    double h1 = 1e-7;
-    double h2 = 1e-9;
+    double h1 = 1e-6;
+    double h2 = 1e-8;
     double inv_h1 = 1.0 / h1;
     double inv_h2 = 1.0 / h2;
     int n1 = (2.576 - 1.281) / h1;

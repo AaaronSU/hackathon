@@ -94,13 +94,39 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Global initial seed: " << global_seed << "      argv[1]= " << argv[1] << "     argv[2]= " << argv[2] <<  std::endl;
 
-    double sum=0.0;
+    std::vector<double> bms;
+    //double sum=0.0;
     double t1=dml_micros();
     for (ui64 run = 0; run < num_runs; ++run) {
-        sum+= black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
+        double result = black_scholes_monte_carlo(S0, K, T, r, sigma, q, num_simulations);
+        bms.push_back(result);
     }
     double t2=dml_micros();
-    std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;
+
+    std::sort(bms.begin(), bms.end());
+
+    double min_val = *std::min_element(bms.begin(), bms.end());
+    double max_val = *std::max_element(bms.begin(), bms.end());
+    double mean = std::accumulate(bms.begin(), bms.end(), 0.0) / bms.size();
+    
+    double variance = 0.0;
+    for (double value : bms) {
+        variance += (value - mean) * (value - mean);
+    }
+    variance /= bms.size();
+    double stddev = std::sqrt(variance);
+
+    double dev_percent = (stddev * 100.0) / mean;
+
+    std::cout << std::fixed << std::setprecision(6)
+              << "Min: " << min_val << "\n"
+              << "Max: " << max_val << "\n"
+              << "Mean: " << mean << "\n"
+              << "Standard Deviation: " << stddev << "\n"
+              << "Standard Deviation (% of Mean): " << dev_percent << "%" << "\n"
+              << "Time taken: " << (t2 - t1) / 1000000.0 << " seconds" << std::endl;
+
+    //std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;
 
     return 0;
 }

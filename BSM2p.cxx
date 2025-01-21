@@ -39,7 +39,8 @@ double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 n
     for (ui64 i = 0; i < num_simulations; ++i) {
         double Z = gaussian_box_muller();
         double ST = f1 * exp(f2 * Z);
-        double payoff = max_bitwise(ST - K, 0.0);
+        double payoff = (ST[i] > K) ? (ST[i] - K) : 0.0;
+        // double payoff = max_bitwise(ST - K, 0.0);
         sum_payoffs += payoff;
     }
     return f3 * (sum_payoffs / num_simulations);

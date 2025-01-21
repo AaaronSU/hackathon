@@ -101,7 +101,7 @@ double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 n
     
         double ST = exp_output * f1;
         //double payoff = std::max(ST - K, 0.0);
-        double payoff = (ST[i] > K) ? (ST[i] - K) : 0.0;
+        double payoff = (ST > K) ? (ST - K) : 0.0;
         // double payoff = max_bitwise(ST - K, 0.0);
         sum_payoffs += payoff;
     }

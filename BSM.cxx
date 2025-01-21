@@ -79,6 +79,7 @@ double exp_fast(double f2, double Z, int n1, int n2, double *table_x, double *ta
     }
 }
 
+/*
 // Function to compute max of two floating points using bitwise operations
 double max_bitwise(double a, double b)
 {
@@ -86,6 +87,7 @@ double max_bitwise(double a, double b)
     return (a & ~mask) | (b & mask)
     // return (a * ~mask) + (b * mask);
 }
+*/
 
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
 double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 num_simulations, int n1, int n2, double *table_x, double *table_y, double inv_h1, double inv_h2) {

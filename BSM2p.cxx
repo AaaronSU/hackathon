@@ -26,12 +26,14 @@ double gaussian_box_muller() {
     return distribution(generator);
 }
 
+/*
 double max_bitwise(double a, double b)
 {
     int mask = -(a < b); // a < b: -1, a >= b: 0
     return (a & ~mask) | (b & mask)
     //return (a * ~mask) + (b * mask);
 }
+*/
 
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
 double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 num_simulations) {

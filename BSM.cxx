@@ -71,7 +71,9 @@ double exp_fast(double f2, double Z, int n1, int n2, double *table_x, double *ta
 
     if (Z >= -2.576 && Z <= 2.576) 
     {
-        return 0.5 * (table_y[i] * (f2 * (Z - table_x[i]) + 1.0) + table_y[i + 1] * (f2 * (Z - table_x[i + 1]) + 1.0));
+        double a = table_x[i];
+        double b = table_y[i ];
+        return b * f2 * (Z - a) + b;
     }
     else 
     {

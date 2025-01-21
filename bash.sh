@@ -1,8 +1,16 @@
 #!/bin/bash
 
-g++ -Ofast -march=native BSM.cxx -o BSM -fopenmp -I/opt/armpl/include -L/opt/armpl/lib -larmpl
-# g++ -O BSM.cxx -o BSM
-./BSM 100000 100
-./BSM 1000000 100
-./BSM 10000000 100
-./BSM 100000000 100
+
+g++ -O BSM2.cxx -o BSM2
+./BSM2 100000 1000000
+./BSM2 1000000 1000000
+./BSM2 10000000 1000000
+./BSM2 100000000 1000000
+
+g++ -Ofast -march=native BSM.cxx -o BSM -fopenmp 
+# -I/opt/armpl/include -L/opt/armpl/lib -larmpl
+
+./BSM 100000 1000000
+./BSM 1000000 1000000
+./BSM 10000000 1000000
+./BSM 100000000 1000000

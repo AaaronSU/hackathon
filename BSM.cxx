@@ -43,14 +43,14 @@ void exp_table(double f2, int n1, int n2, double *table_x, double *table_y, doub
         table_x[i] = -2.576 + i * h1;
         table_y[i] = exp((-2.576 + i * h1) * f2);
     }
-    #pragma omp parallel for
-    for (int i = n1 + 1; i < n2 + 1; i ++) 
+    #pragma omp parallel for 
+    for (int i = n1 + 1; i < n1 + n2 + 1; i ++) 
     {
         table_x[i] = -1.281 + i * h2;
         table_y[i] = exp((-1.281 + i * h2) * f2);
     }
-    #pragma omp parallel for
-    for (int i = n2 + 1; i < n1 + n2 + 2; i ++) 
+    #pragma omp parallel for 
+    for (int i = n1 + n2 + 1; i < n1 + n2 + n1 + 2; i ++) 
     {
         table_x[i] = 1.281 + i * h1;
         table_y[i] = exp((1.281 + i * h1) * f2);
@@ -91,7 +91,7 @@ double max_bitwise(double a, double b)
 double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 num_simulations, int n1, int n2, double *table_x, double *table_y, double inv_h1, double inv_h2) {
     double sum_payoffs = 0.0;
    
-    #pragma omp parallel for
+    #pragma omp parallel for reduction(+:sum_payoffs)
     for (ui64 i = 0; i < num_simulations; ++i) 
     {
         double Z = gaussian_box_muller();
@@ -150,6 +150,7 @@ int main(int argc, char* argv[]) {
 
     double sum=0.0;
     double t1=dml_micros();
+    #pragma omp parallel for reduction(+:sum)
     for (ui64 run = 0; run < num_runs; ++run) 
     {
         sum+= black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);

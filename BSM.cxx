@@ -42,18 +42,14 @@ void exp_table(double f2, int n1, int n2, double *table_x, double *table_y, doub
     {
         table_x[i] = -2.576 + i * h1;
         table_y[i] = exp((-2.576 + i * h1) * f2);
+        table_x[i + n1 + n2] = 1.281 + i * h1;
+        table_y[i + n1 + n2] = exp((1.281 + i  * h1) * f2);
     }
     #pragma omp parallel for 
-    for (int i = n1 + 1; i < n1 + n2 + 1; i ++) 
+    for (int i = 1; i < n2; i ++) 
     {
-        table_x[i] = -1.281 + i * h2;
-        table_y[i] = exp((-1.281 + i * h2) * f2);
-    }
-    #pragma omp parallel for 
-    for (int i = n1 + n2 + 1; i < n1 + n2 + n1 + 2; i ++) 
-    {
-        table_x[i] = 1.281 + i * h1;
-        table_y[i] = exp((1.281 + i * h1) * f2);
+        table_x[i + n1] = -1.281 + i * h2;
+        table_y[i + n1] = exp((-1.281 + i * h2) * f2);
     }
 }
 
@@ -71,9 +67,13 @@ double exp_fast(double f2, double Z, int n1, int n2, double *table_x, double *ta
 
     if (Z >= -2.576 && Z <= 2.576) 
     {
-        double a = table_x[i];
-        double b = table_y[i ];
-        return b * f2 * (Z - a) + b;
+        double a1 = table_x[i];
+        double a2 = table_x[i + 1];
+        double b1 = table_y[i ];
+        double b2 = table_y[i + 1];
+        double tmp = b1 * f2 * (Z - a1) + b1 + b2 * f2 * (Z - a2) + b2;
+        tmp *= 0.5;
+        return tmp;
     }
     else 
     {
@@ -102,6 +102,10 @@ double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 n
     
     // double ST = S0 * exp((r - q - 0.5 * sigma * sigma) * T + sigma * sqrt(T) * Z);
         double exp_output = exp_fast(f2, Z, n1, n2, table_x, table_y, inv_h1, inv_h2);
+
+        // print
+        std::cout << " exp_output = " << exp_output << std::endl;
+        std::cout << " exp real =" << exp(Z * f2) << std::endl;
     
         double ST = exp_output * f1;
         //double payoff = std::max(ST - K, 0.0);
@@ -141,8 +145,8 @@ int main(int argc, char* argv[]) {
     double factor3 = exp(-r * T);
 
     // Precompute the exp table
-    double h1 = 1e-5;
-    double h2 = 1e-7;
+    double h1 = 1e-7;
+    double h2 = 1e-9;
     double inv_h1 = 1.0 / h1;
     double inv_h2 = 1.0 / h2;
     int n1 = (2.576 - 1.281) / h1;

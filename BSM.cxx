@@ -158,17 +158,38 @@ int main(int argc, char* argv[]) {
     double *table_y = (double *)malloc(size * sizeof(double));
     exp_table(factor2, n1, n2, table_x, table_y, h1, h2);
 
-    double sum=0.0;
+    // double sum=0.0;
+    std::vector<double> bms;
     double t1=dml_micros();
-    #pragma omp parallel for reduction(+:sum)
     for (ui64 run = 0; run < num_runs; ++run) 
     {
         double value = black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);
-        std::cout << run << " value= " << value << std::endl;
-        sum+= value;
+        bms.push_back(value);
     }
     double t2=dml_micros();
-    std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;
+
+    double min_val = *std::min_element(bms.begin(), bms.end());
+    double max_val = *std::max_element(bms.begin(), bms.end());
+    double mean = std::accumulate(bms.begin(), bms.end(), 0.0) / bms.size();
+    
+    double variance = 0.0;
+    for (double value : bms) {
+        variance += (value - mean) * (value - mean);
+    }
+    variance /= bms.size();
+    double stddev = std::sqrt(variance);
+
+    double dev_percent = (stddev * 100.0) / mean;
+
+    std::cout << std::fixed << std::setprecision(6)
+              << "Min: " << min_val << "\n"
+              << "Max: " << max_val << "\n"
+              << "Mean: " << mean << "\n"
+              << "Standard Deviation: " << stddev << "\n"
+              << "Standard Deviation (% of Mean): " << dev_percent << "%" << "\n"
+              << "Time taken: " << (t2 - t1) / 1000000.0 << " seconds" << std::endl;
+
+    //std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;
 
     return 0;
 }

@@ -103,8 +103,6 @@ int main(int argc, char* argv[]) {
     }
     double t2=dml_micros();
 
-    std::sort(bms.begin(), bms.end());
-
     double min_val = *std::min_element(bms.begin(), bms.end());
     double max_val = *std::max_element(bms.begin(), bms.end());
     double mean = std::accumulate(bms.begin(), bms.end(), 0.0) / bms.size();

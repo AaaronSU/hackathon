@@ -142,8 +142,8 @@ int main(int argc, char* argv[]) {
     double inv_h1 = 1.0 / h1;
     double inv_h2 = 1.0 / h2;
     int n1 = (2.576 - 1.281) / h1;
-    int n2 = (1.281 - (-1.281)) / h2;
-    int size = n1 + n2 + 1;
+    int n2 = (1.281 + 1.281) / h2;
+    int size = n1 + n2 + n1 + 1;
     double *table_x = (double *)malloc(size * sizeof(double));
     double *table_y = (double *)malloc(size * sizeof(double));
     exp_table(factor2, n1, n2, table_x, table_y, h1, h2);

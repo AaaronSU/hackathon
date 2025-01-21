@@ -139,8 +139,8 @@ int main(int argc, char* argv[]) {
     double factor3 = exp(-r * T);
 
     // Precompute the exp table
-    double h1 = 0.001;
-    double h2 = 0.00001;
+    double h1 = 1e-5;
+    double h2 = 1e-7;
     double inv_h1 = 1.0 / h1;
     double inv_h2 = 1.0 / h2;
     int n1 = (2.576 - 1.281) / h1;

@@ -53,7 +53,7 @@ void exp_table(double f2, int n1, int n2, double *table_x, double *table_y, doub
     for (int i = n2 + 1; i < n1 + n2 + 2; i ++) 
     {
         table_x[i] = 1.281 + i * h1;
-        table_y = exp((1.281 + i * h1) * f2);
+        table_y[i] = exp((1.281 + i * h1) * f2);
     }
 }
 
@@ -88,7 +88,7 @@ double max_bitwise(double a, double b)
 }
 
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
-double black_scholes_monte_carlo(double f1, double f2, ui64 num_simulations, int n1, int n2, double *table_x, double *table_y, double inv_h1, double inv_h2) {
+double black_scholes_monte_carlo(double f1, double f2, double f3, ui64 K, ui64 num_simulations, int n1, int n2, double *table_x, double *table_y, double inv_h1, double inv_h2) {
     double sum_payoffs = 0.0;
    
     #pragma omp parallel for
@@ -105,7 +105,7 @@ double black_scholes_monte_carlo(double f1, double f2, ui64 num_simulations, int
         double payoff = max_bitwise(ST - K, 0.0);
         sum_payoffs += payoff;
     }
-    return exp(-r * T) * (sum_payoffs / num_simulations);
+    return f3 * (sum_payoffs / num_simulations);
 }
 
 int main(int argc, char* argv[]) {
@@ -134,6 +134,7 @@ int main(int argc, char* argv[]) {
     // Precompute the factors
     double factor1 = S0 * exp((r - q - 0.5 * sigma * sigma) * T);
     double factor2 = sigma * sqrt(T);
+    double factor3 = exp(-r * T);
 
     // Precompute the exp table
     double h1 = 0.001;
@@ -151,7 +152,7 @@ int main(int argc, char* argv[]) {
     double t1=dml_micros();
     for (ui64 run = 0; run < num_runs; ++run) 
     {
-        sum+= black_scholes_monte_carlo(factor1, factor2, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);
+        sum+= black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);
     }
     double t2=dml_micros();
     std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;

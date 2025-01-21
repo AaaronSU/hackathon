@@ -71,8 +71,7 @@ double exp_fast(double f2, double Z, int n1, int n2, double *table_x, double *ta
 
     if (Z >= -2.576 && Z <= 2.576) 
     {
-        double res = (table_y[i] + table_y[i + 1] - f2 * (table_x[i] + table_x[i + 1])) * 0.5 + f2 * Z;
-        return res;
+        return 0.5 * (table_y[i] * (f2 * (Z - table_x[i]) + 1.0) + table_y[i + 1] * (f2 * (Z - table_x[i + 1]) + 1.0));
     }
     else 
     {
@@ -84,7 +83,8 @@ double exp_fast(double f2, double Z, int n1, int n2, double *table_x, double *ta
 double max_bitwise(double a, double b)
 {
     int mask = -(a < b); // a < b: -1, a >= b: 0
-    return (a * ~mask) + (b * mask);
+    return (a & ~mask) | (b & mask)
+    // return (a * ~mask) + (b * mask);
 }
 
 // Function to calculate the Black-Scholes call option price using Monte Carlo method
@@ -153,7 +153,9 @@ int main(int argc, char* argv[]) {
     #pragma omp parallel for reduction(+:sum)
     for (ui64 run = 0; run < num_runs; ++run) 
     {
-        sum+= black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);
+        double value = black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations, n1, n2, table_x, table_y, inv_h1, inv_h2);
+        std::cout << run << " value= " << value << std::endl;
+        sum+= value;
     }
     double t2=dml_micros();
     std::cout << std::fixed << std::setprecision(6) << " value= " << sum/num_runs << " in " << (t2-t1)/1000000.0 << " seconds" << std::endl;

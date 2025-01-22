@@ -19,13 +19,14 @@ double dml_micros() {
 // Vectorized Gaussian random number generation using Box-Muller transform
 svfloat64_t gaussian_box_muller_sve(svbool_t pg, svfloat64_t u1, svfloat64_t u2) {
     svfloat64_t log_u1 = Sleef_finz_logdx_u10sve(u1);
-    svfloat64_t sqrt_term = Sleef_finz_powdx_u10sve(svmul_f64_z(pg, svdup_f64(-2.0), log_u1), svdup_f64(0.5));
+    // svfloat64_t sqrt_term = Sleef_finz_powdx_u10sve(svmul_f64_z(pg, svdup_f64(-2.0), log_u1), svdup_f64(0.5));
+    svfloat64_t sqrt_term = svsqrt_f64_z(pg, svmul_f64_z(pg, svdup_f64(-2.0), log_u1));
     svfloat64_t theta = svmul_f64_z(pg, svdup_f64(2.0 * M_PI), u2);
     return svmul_f64_z(pg, sqrt_term, Sleef_finz_cosdx_u10sve(theta));
 }
 
 // Vectorized Monte Carlo Black-Scholes simulation
-double black_scholes_monte_carlo_sve(double f1, double f2, double f3, ui64 K, ui64 num_simulations) {
+double black_scholes_monte_carlo_sve(double f1, double f2, double f3, double f4, ui64 K, ui64 num_simulations) {
     double sum_payoffs = 0.0;
     ui64 i = 0;
     svbool_t pg = svwhilelt_b64(i, num_simulations);
@@ -50,13 +51,25 @@ double black_scholes_monte_carlo_sve(double f1, double f2, double f3, ui64 K, ui
         svfloat64_t Z = gaussian_box_muller_sve(pg, sv_u1, sv_u2);
 
         // Compute ST = f1 * exp(f2 * Z)
-        svfloat64_t ST = svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z)));
+        //svfloat64_t ST = svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z)));
 
         // Compute payoff = max(ST - K, 0.0)
-        svfloat64_t payoff = svmax_f64_z(pg, svsub_f64_z(pg, ST, svdup_f64(K)), svdup_f64(0.0));
+        //svfloat64_t payoff = svmax_f64_z(pg, svsub_f64_z(pg, ST, svdup_f64(K)), svdup_f64(0.0));
+
+       
+        // double payoff = (Z > f4) * (f1 * exp(f2 * Z) - K);
+        /*
+        svfloat64_t payoff = svmul_f64_z(
+            svcmpgt_f64(pg, Z, svdup_f64(f4)), // predicate: Z <= f4 then return 0 
+            svdup_f64(1.0),
+            svsub_f64_z(pg, svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z))), svdup_f64(K)));
+        */
 
         // Accumulate payoffs
-        sum_payoffs += svaddv_f64(pg, payoff);
+        // sum_payoffs += svaddv_f64(pg, payoff);
+        svbool_t pd = svcmpgt_f64(pg, Z, svdup_f64(f4)); // predicate: Z <= f4 then return 0
+        sum_payoffs += svaddv_f64(pd, svsub_f64_z(pg, svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z))), svdup_f64(K)));
+
 
         // Move to the next batch
         i += svcntd();
@@ -85,13 +98,14 @@ int main(int argc, char* argv[]) {
     double factor1 = S0 * exp((r - q - 0.5 * sigma * sigma) * T);
     double factor2 = sigma * sqrt(T);
     double factor3 = exp(-r * T);
+    double factor4 = log(K / factor1) / factor2;
 
     double sum = 0.0;
     double t1 = dml_micros();
     #pragma omp parallel for reduction(+:sum)
     std::vector<double> bms;
     for (ui64 run = 0; run < num_runs; ++run) {
-        double result = black_scholes_monte_carlo(factor1, factor2, factor3, K, num_simulations);
+        double result = black_scholes_monte_carlo(factor1, factor2, factor3, factor4, K, num_simulations);
         bms.push_back(result);
     }
     double t2 = dml_micros();

@@ -1,6 +1,9 @@
 #include <iostream>
 #include <cmath>
 #include <random>
+#include <vector>
+#include <numeric>
+#include <algorithm>
 #include <iomanip>
 #include <omp.h>
 #include <arm_sve.h>
@@ -100,15 +103,14 @@ int main(int argc, char* argv[]) {
     double factor3 = exp(-r * T);
     double factor4 = log(K / factor1) / factor2;
 
-    double sum = 0.0;
+    std::vector<double> bms[num_runs];
     double t1 = dml_micros();
-    #pragma omp parallel for reduction(+:sum)
-    std::vector<double> bms;
+    #pragma omp parallel for 
     for (ui64 run = 0; run < num_runs; ++run) {
-        double result = black_scholes_monte_carlo(factor1, factor2, factor3, factor4, K, num_simulations);
-        bms.push_back(result);
+        bms[run] = black_scholes_monte_carlo(factor1, factor2, factor3, factor4, K, num_simulations);
     }
     double t2 = dml_micros();
+    
     // Calculate statistics
 
     double min_val = *std::min_element(bms.begin(), bms.end());

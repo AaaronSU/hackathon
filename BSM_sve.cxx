@@ -32,8 +32,7 @@ svfloat64_t gaussian_box_muller_sve(svbool_t pg, svfloat64_t u1, svfloat64_t u2)
 double black_scholes_monte_carlo_sve(double f1, double f2, double f3, double f4, ui64 K, ui64 num_simulations) {
     double sum_payoffs = 0.0;
     ui64 i = 0;
-    svbool_t pg = svwhilelt_b64(i, num_simulations);
-    
+    svbool_t pg = svwhilelt_b64(i, num_simulations);   
 
     std::mt19937_64 rng(std::random_device{}());
     std::uniform_real_distribution<double> uniform_dist(0.0, 1.0);
@@ -53,22 +52,8 @@ double black_scholes_monte_carlo_sve(double f1, double f2, double f3, double f4,
         // Convert to Gaussian random numbers
         svfloat64_t Z = gaussian_box_muller_sve(pg, sv_u1, sv_u2);
 
-        // Compute ST = f1 * exp(f2 * Z)
-        //svfloat64_t ST = svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z)));
-
-        // Compute payoff = max(ST - K, 0.0)
-        //svfloat64_t payoff = svmax_f64_z(pg, svsub_f64_z(pg, ST, svdup_f64(K)), svdup_f64(0.0));
-
-       
-        // double payoff = (Z > f4) * (f1 * exp(f2 * Z) - K);
-        /*
-        svfloat64_t payoff = svmul_f64_z(
-            svcmpgt_f64(pg, Z, svdup_f64(f4)), // predicate: Z <= f4 then return 0 
-            svdup_f64(1.0),
-            svsub_f64_z(pg, svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z))), svdup_f64(K)));
-        */
-
         // Accumulate payoffs
+        // Compute ST = f1 * exp(f2 * Z)
         // sum_payoffs += svaddv_f64(pg, payoff);
         svbool_t pd = svcmpgt_f64(pg, Z, svdup_f64(f4)); // predicate: Z <= f4 then return 0
         sum_payoffs += svaddv_f64(pd, svsub_f64_z(pg, svmul_f64_z(pg, svdup_f64(f1), Sleef_finz_expdx_u10sve(svmul_f64_z(pg, svdup_f64(f2), Z))), svdup_f64(K)));
@@ -103,11 +88,11 @@ int main(int argc, char* argv[]) {
     double factor3 = exp(-r * T);
     double factor4 = log(K / factor1) / factor2;
 
-    std::vector<double> bms[num_runs];
+    std::vector<double> bms(num_runs);
     double t1 = dml_micros();
     #pragma omp parallel for 
     for (ui64 run = 0; run < num_runs; ++run) {
-        bms[run] = black_scholes_monte_carlo(factor1, factor2, factor3, factor4, K, num_simulations);
+        bms[run] = black_scholes_monte_carlo_sve(factor1, factor2, factor3, factor4, K, num_simulations);
     }
     double t2 = dml_micros();
     

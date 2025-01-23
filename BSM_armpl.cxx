@@ -66,7 +66,7 @@ double black_scholes_monte_carlo_mkl(double f1, double f2, double f3, ui64 K, ui
     
     // Calcul des payoffs
     //#pragma omp parallel for reduction(+:sum_payoffs)
-    #pragma GCC unroll 8
+    //#pragma GCC unroll 8
     for (ui64 i = 0; i < num_simulations; ++i) {
         double Z = r[i]; 
         //std::cout << Z << std::endl;

@@ -1,0 +1,26 @@
+{
+  "config": {
+    "experiment_name": "report_g++",
+    "executable": "./kk1",
+    "run_command": "<executable> 100000 1000000",
+    "external_libraries"       : [
+      "/usr/local/lib/libtrng4.so.27",
+      "/lib64/libgsl.so.0",
+      "/lib64/libgslcblas.so.0",
+      "/lib64/libm.so.6",
+      "/opt/gcc-14.2/lib64/libstdc++.so.6",
+      "/opt/gcc-14.2/lib64/libgomp.so.1",
+      "/opt/gcc-14.2/lib64/libgcc_s.so.1",
+      "/lib64/libpthread.so.0",
+      "/lib64/libc.so.6",
+      "/usr/lib64/atlas/libsatlas.so.3",
+      "/lib/ld-linux-aarch64.so.1",
+      "/lib64/libdl.so.2",
+      "/lib64/libgfortran.so.4"
+    ],
+    "custom_categories": [{"type": "all-external-libraries"}],
+    "lstopo_output_format": "console",
+    "keep_executable_location": true,
+    "lprof_params": ""
+  }
+}

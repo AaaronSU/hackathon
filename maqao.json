@@ -1,0 +1,9 @@
+{
+  "config": {
+    "experiment_name": "report_opt",
+    "executable": "./kk1",
+    "run_command": "./kk1 100000 1000000",
+    "external_libraries": [],
+    "custom_categories": [{"type": "all-external-libraries"}]
+  }
+}
